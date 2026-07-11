@@ -8,6 +8,10 @@
   "bin": {
     "mcdev-mcp": "dist/cli.js"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./agent": "./dist/agent-client.js"
+  },
   "files": [
     "dist",
     "resources",
@@ -22,6 +26,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "prepare": "pnpm build",
     "prepublishOnly": "pnpm build",
     "mcpb": "bash scripts/build-mcpb.sh"
   },
