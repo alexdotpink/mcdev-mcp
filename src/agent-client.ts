@@ -29,3 +29,7 @@ export async function callClient(
 export function disconnectClient(clientValue?: MinecraftClientName): void {
     getClientSession(normalizeClient(clientValue)).disconnect();
 }
+
+export function cancelClient(clientValue?: MinecraftClientName, reason?: string): void {
+    getClientSession(normalizeClient(clientValue)).cancelPending(reason);
+}

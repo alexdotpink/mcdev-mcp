@@ -291,12 +291,15 @@ export class BridgeSession {
     }
 
     disconnect() {
+        for (const [, pending] of this.pendingRequests) {
+            pending.reject(new Error("Bridge session disconnected"));
+        }
+        this.pendingRequests.clear();
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
         this.connectedPort = null;
-        this.pendingRequests.clear();
     }
 
     /** Cancel in-flight work by terminating the controlling connection. */
