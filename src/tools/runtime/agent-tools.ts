@@ -53,7 +53,7 @@ export const mcClientsTool = {
 
 export const mcExecuteBothTool = {
     name: "mc_execute_both",
-    description: "Run arbitrary Groovy concurrently inside both real clients and return both structured execution records.",
+    description: "Run arbitrary Groovy inside both real clients with an optional true cross-client barrier and return both structured execution records.",
     inputSchema: {
         type: "object" as const,
         properties: {
@@ -61,17 +61,36 @@ export const mcExecuteBothTool = {
             primaryCode: { type: "string" },
             secondaryCode: { type: "string" },
             timeoutMs: { type: "integer", minimum: 1000, maximum: 300000 },
+            barrier: { type: "boolean", description: "Wait until both client JVMs reach the same rendezvous before running either body. Defaults to true." },
         },
     },
-    handler: async (args: { code?: string; primaryCode?: string; secondaryCode?: string; timeoutMs?: number }) => {
+    handler: async (args: { code?: string; primaryCode?: string; secondaryCode?: string; timeoutMs?: number; barrier?: boolean }) => {
         const primaryCode = args.primaryCode ?? args.code;
         const secondaryCode = args.secondaryCode ?? args.code;
         if (!primaryCode || !secondaryCode) throw new Error("Provide code or both client-specific code values");
-        const [primary, secondary] = await Promise.all([
-            executeOnClient({ client: "primary", code: primaryCode, timeoutMs: args.timeoutMs }),
-            executeOnClient({ client: "secondary", code: secondaryCode, timeoutMs: args.timeoutMs }),
-        ]);
-        return text({ primary: JSON.parse(primary.content[0].text), secondary: JSON.parse(secondary.content[0].text) });
+        const barrier = args.barrier ?? true;
+        const barrierDir = path.join(process.env.MCDEV_MCP_BARRIER_DIR ?? "/tmp/mcdev-mcp-barriers", randomUUID());
+        if (barrier) await mkdir(barrierDir, { recursive: true });
+        const wrap = (client: MinecraftClientName, peer: MinecraftClientName, code: string) => barrier
+            ? `
+def __mcdevBarrierDir = java.nio.file.Path.of(${JSON.stringify(barrierDir)})
+java.nio.file.Files.writeString(__mcdevBarrierDir.resolve(${JSON.stringify(client)}), "ready")
+def __mcdevBarrierDeadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30)
+while (!java.nio.file.Files.exists(__mcdevBarrierDir.resolve(${JSON.stringify(peer)}))) {
+  if (System.nanoTime() >= __mcdevBarrierDeadline) throw new java.util.concurrent.TimeoutException("peer did not reach mc_execute_both barrier")
+  Thread.sleep(5)
+}
+${code}`
+            : code;
+        try {
+            const [primary, secondary] = await Promise.all([
+                executeOnClient({ client: "primary", code: wrap("primary", "secondary", primaryCode), timeoutMs: args.timeoutMs }),
+                executeOnClient({ client: "secondary", code: wrap("secondary", "primary", secondaryCode), timeoutMs: args.timeoutMs }),
+            ]);
+            return text({ barrier, primary: JSON.parse(primary.content[0].text), secondary: JSON.parse(secondary.content[0].text) });
+        } finally {
+            if (barrier) await rm(barrierDir, { recursive: true, force: true });
+        }
     },
 };
 
@@ -209,3 +228,6 @@ export const agentRuntimeTools = [
     mcEventsTool,
     mcTestControlTool,
 ];
+import { mkdir, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import path from "node:path";
