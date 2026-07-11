@@ -1,5 +1,6 @@
 import { getClientSession, normalizeClient, requireLease } from "./tools/runtime/client-registry.js";
 import { executeOnClient } from "./tools/runtime/execute.js";
+import { mcExecuteBothTool } from "./tools/runtime/agent-tools.js";
 import type { BridgeResponse, MinecraftClientName } from "./tools/runtime/types.js";
 
 export type { BridgeResponse, MinecraftClientName };
@@ -12,6 +13,16 @@ export async function executeGroovy(options: {
     snippet?: string;
 }) {
     return executeOnClient(options);
+}
+
+export async function executeBothGroovy(options: {
+    code?: string;
+    primaryCode?: string;
+    secondaryCode?: string;
+    timeoutMs?: number;
+    barrier?: boolean;
+}) {
+    return mcExecuteBothTool.handler(options);
 }
 
 export async function callClient(
