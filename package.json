@@ -1,6 +1,7 @@
 {
   "name": "mcdev-mcp",
   "version": "2.2.1",
+  "packageManager": "pnpm@10.14.0",
   "description": "MCP server for Minecraft mod development - provides decompiled code access, symbol search, and runtime interaction via DebugBridge",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +22,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "pnpm build",
     "mcpb": "bash scripts/build-mcpb.sh"
   },
   "keywords": [
@@ -38,12 +39,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/use-ai-for-mc/mcdev-mcp.git"
+    "url": "git+https://github.com/alexdotpink/mcdev-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/use-ai-for-mc/mcdev-mcp/issues"
+    "url": "https://github.com/alexdotpink/mcdev-mcp/issues"
   },
-  "homepage": "https://github.com/use-ai-for-mc/mcdev-mcp#readme",
+  "homepage": "https://github.com/alexdotpink/mcdev-mcp#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "axios": "^1.16.0",

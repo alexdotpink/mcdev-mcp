@@ -287,6 +287,17 @@ cheat-sheet.)
 return player.blockPosition().toShortString()
 ```
 
+The agent-driven fork treats this as the primary live exploration tool and
+supports explicit `primary` / `secondary` clients, automatic exclusive Codex
+leases, concurrent `mc_execute_both`, saved Groovy snippets, redacted execution
+history, and cancellation. Stable helpers (`mc_input`, `mc_look`,
+`mc_screen_state`, `mc_screen_action`, `mc_hud_inspect`, `mc_events`) drive the
+real rendered 1.21.10 client without replacing arbitrary custom code.
+
+`mc_test_control` sends signed structured requests through the real client to
+the FumazTest-only mGameMaker channel for environment attestation, server
+leases, fixtures, named fault injection, and authoritative runtime evidence.
+
 ### `mc_snapshot`
 Get a structured snapshot of current game state (player, world, time, weather).
 

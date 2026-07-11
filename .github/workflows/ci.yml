@@ -22,19 +22,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build TypeScript
-        run: npm run build
+        run: pnpm build
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 
       - name: Verify CLI
         run: |
@@ -56,16 +60,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '22.x'
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Check TypeScript
-        run: npx tsc --noEmit
+        run: pnpm typecheck
 
   # Sanity-check that the pushed tag matches the versions baked into
   # package.json and manifest.json. Cheap fail-fast before the matrix
@@ -100,13 +108,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '22.x'
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install --no-fund --no-audit
+        run: pnpm install --frozen-lockfile
 
       - name: Build MCPB bundle
         run: bash scripts/build-mcpb.sh
@@ -134,6 +146,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -143,19 +158,20 @@ jobs:
           # ships npm 11.x.
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm build
 
       - name: Publish to npm
         # Trusted Publishing: the OIDC token minted via `id-token: write` is
         # exchanged for a short-lived npm publish credential, scoped to this
         # repo+workflow. No NPM_TOKEN secret needed. `--provenance` records a
         # signed attestation that this version was built from this workflow.
-        run: npm publish --provenance
+        run: pnpm publish --provenance --no-git-checks
 
       - name: Download MCPB artifact
         uses: actions/download-artifact@v8

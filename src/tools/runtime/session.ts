@@ -28,13 +28,16 @@ export class BridgeSession {
     // each open their own WebSocket and race for `this.ws`. Cleared once the
     // attempt settles (success or failure) so the next caller gets a fresh try.
     private connectPromise: Promise<SessionInfo> | null = null;
+    private readonly authToken: string;
 
     // Tracked session info for reconnect verification
     private expectedGameDir: string | null = null;
     private lastSessionInfo: SessionInfo | null = null;
 
-    constructor(defaultPort: number = DEFAULT_PORT) {
+    constructor(defaultPort: number = DEFAULT_PORT, authToken = "", autoScan = true) {
         this.configuredPort = defaultPort;
+        this.authToken = authToken;
+        this.autoScan = autoScan;
     }
 
     /** Set port without connecting. Resets expected game instance. */
@@ -173,7 +176,12 @@ export class BridgeSession {
                 this.connectedPort = targetPort;
                 this.setupWebSocketHandlers(ws);
                 try {
+                    if (this.authToken) {
+                        const auth = await this.send("authenticate", { token: this.authToken });
+                        if (!auth.success) throw new Error(auth.error ?? "DebugBridge authentication failed");
+                    }
                     const status = await this.send("status", {});
+                    if (!status.success) throw new Error(status.error ?? "DebugBridge status failed");
                     resolve(status.result as SessionInfo);
                 } catch (e) {
                     reject(e);
@@ -291,6 +299,15 @@ export class BridgeSession {
         this.pendingRequests.clear();
     }
 
+    /** Cancel in-flight work by terminating the controlling connection. */
+    cancelPending(reason = "Execution cancelled by Codex") {
+        for (const [, pending] of this.pendingRequests) pending.reject(new Error(reason));
+        this.pendingRequests.clear();
+        if (this.ws) this.ws.terminate();
+        this.ws = null;
+        this.connectedPort = null;
+    }
+
     /** Full reset - clears all state including expected instance */
     reset() {
         this.disconnect();
@@ -306,4 +323,8 @@ export class BridgeSession {
 }
 
 // Singleton session instance
-export const bridgeSession = new BridgeSession();
+export const bridgeSession = new BridgeSession(
+    Number(process.env.DEBUGBRIDGE_PRIMARY_PORT ?? DEFAULT_PORT),
+    process.env.DEBUGBRIDGE_PRIMARY_TOKEN ?? "",
+    false,
+);

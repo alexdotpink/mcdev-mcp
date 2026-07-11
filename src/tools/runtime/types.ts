@@ -1,9 +1,14 @@
 export interface BridgeRequest {
     id: string;
     type: "execute" | "search" | "snapshot" | "screenshot" | "runCommand" | "status"
+        | "authenticate" | "capabilities" | "input" | "look" | "screenState"
+        | "screenAction" | "hudInspect" | "events"
+        | "testControl"
         | "screenInspect" | "disconnect" | "joinServer" | "quit";
     payload: Record<string, unknown>;
 }
+
+export type MinecraftClientName = "primary" | "secondary";
 
 export interface BridgeResponse {
     id: string;

@@ -1,14 +1,17 @@
-import { bridgeSession } from "./session.js";
 import { scriptLogger } from "./script-logger.js";
 import { isEnvOn } from "../../utils/env.js";
+import { randomUUID } from "node:crypto";
+import { appendHistory, hashCode } from "./agent-store.js";
+import { getClientSession, normalizeClient, requireLease } from "./client-registry.js";
+import type { MinecraftClientName } from "./types.js";
 
 const scriptLogsEnabled = isEnvOn('MCDEV_SCRIPT_LOGS');
 
 export const mcExecuteTool = {
     name: "mc_execute",
-    description: `Execute GROOVY code in the Minecraft session (the runtime migrated from Lua to Apache Groovy 5 in mid-2026 — see the migration note at the end if you knew the old surface). The binding is persistent: undeclared assignments (x = 5) survive to later calls; def x is script-local.
+    description: `Execute arbitrary GROOVY inside a real rendered Minecraft client. This is the primary agentic exploration tool: inspect internals, test hypotheses, attach temporary state, drive behavior, and iterate live. The binding is persistent per client: undeclared assignments (x = 5) survive to later calls; def x is script-local.
 
-PREFER NATIVE TOOLS WHERE POSSIBLE — they're faster and avoid script overhead:
+Native tools remain useful stable shortcuts:
 - Player state (x/y/z/yaw/pitch/look/velocity/vehicle/raycast target/world): mc_snapshot
 - Nearby entities or one entity's details: mc_nearby_entities / mc_entity_details
 - Nearby block entities (signs, chests, etc.): mc_nearby_blocks / mc_block_details
@@ -81,12 +84,36 @@ print(x) -> println x; pcall -> try/catch; local x -> def x;
                 minimum: 1000,
                 maximum: 300000,
             },
+            client: {
+                type: "string",
+                enum: ["primary", "secondary"],
+                description: "Real Minecraft client to execute inside. Defaults to primary.",
+            },
+            leaseId: {
+                type: "string",
+                description: "Optional explicit client lease. A Codex lease is acquired automatically when absent.",
+            },
         },
         required: ["code"],
     },
 
-    handler: async (args: { code: string; timeoutMs?: number }) => {
+    handler: async (args: { code: string; timeoutMs?: number; client?: MinecraftClientName; leaseId?: string }) => {
+        return executeOnClient(args);
+    }
+};
+
+export async function executeOnClient(args: {
+    code: string;
+    timeoutMs?: number;
+    client?: MinecraftClientName;
+    leaseId?: string;
+    snippet?: string;
+}) {
+        const client = normalizeClient(args.client);
+        const lease = requireLease(client, args.leaseId);
+        const session = getClientSession(client);
         const startTime = Date.now();
+        const executionId = randomUUID();
         try {
             // `timeoutMs` is intentionally passed to two different layers:
             //   * payload `{ code, timeoutMs }` — bounds the script's own
@@ -105,8 +132,21 @@ print(x) -> println x; pcall -> try/catch; local x -> def x;
             // race the bridge usually lost, so callers saw "the game may be
             // frozen" instead of the script's real timeout result.
             const timeoutMs = args.timeoutMs ?? 10000;
-            const resp = await bridgeSession.send("execute", { code: args.code, timeoutMs }, timeoutMs);
+            const resp = await session.send("execute", { code: args.code, timeoutMs }, timeoutMs);
             const duration_ms = Date.now() - startTime;
+
+            appendHistory({
+                id: executionId,
+                timestamp: new Date().toISOString(),
+                client,
+                codeHash: hashCode(args.code),
+                snippet: args.snippet,
+                success: resp.success,
+                durationMs: duration_ms,
+                output: resp.output,
+                result: resp.result,
+                error: resp.error,
+            });
 
             // Log the execution (dev mode only)
             if (scriptLogsEnabled) {
@@ -127,15 +167,31 @@ print(x) -> println x; pcall -> try/catch; local x -> def x;
             }
 
             if (!resp.success) {
-                return { content: [{ type: "text" as const, text: `Error: ${resp.error}` }], isError: true };
+                return { content: [{ type: "text" as const, text: JSON.stringify({ executionId, client, leaseId: lease.id, success: false, durationMs: duration_ms, error: resp.error }, null, 2) }], isError: true };
             }
-            let text = "";
-            if (resp.output) text += resp.output + "\n";
-            if (resp.result) text += JSON.stringify(resp.result, null, 2);
-            return { content: [{ type: "text" as const, text: text.trim() || "(no output)" }] };
+            return { content: [{ type: "text" as const, text: JSON.stringify({
+                executionId,
+                client,
+                leaseId: lease.id,
+                success: true,
+                durationMs: duration_ms,
+                output: resp.output || undefined,
+                result: resp.result,
+            }, null, 2) }] };
         } catch (e: unknown) {
             const duration_ms = Date.now() - startTime;
             const msg = e instanceof Error ? e.message : String(e);
+
+            appendHistory({
+                id: executionId,
+                timestamp: new Date().toISOString(),
+                client,
+                codeHash: hashCode(args.code),
+                snippet: args.snippet,
+                success: false,
+                durationMs: duration_ms,
+                error: msg,
+            });
 
             // Log connection/timeout errors too (dev mode only)
             if (scriptLogsEnabled) {
@@ -148,7 +204,6 @@ print(x) -> println x; pcall -> try/catch; local x -> def x;
                 });
             }
 
-            return { content: [{ type: "text" as const, text: msg }], isError: true };
+            return { content: [{ type: "text" as const, text: JSON.stringify({ executionId, client, leaseId: lease.id, success: false, durationMs: duration_ms, error: msg }, null, 2) }], isError: true };
         }
-    }
-};
+}

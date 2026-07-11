@@ -23,6 +23,7 @@ export { mcLeaveServerTool } from './leave-server.js';
 export { mcWaitUntilInWorldTool } from './wait-until-in-world.js';
 export { mcQuitClientTool } from './quit-client.js';
 export { mcWaitForBridgeTool } from './wait-for-bridge.js';
+export { agentRuntimeTools } from './agent-tools.js';
 
 import { mcConnectTool } from './connect.js';
 import { mcExecuteTool } from './execute.js';
@@ -49,6 +50,7 @@ import { mcLeaveServerTool } from './leave-server.js';
 import { mcWaitUntilInWorldTool } from './wait-until-in-world.js';
 import { mcQuitClientTool } from './quit-client.js';
 import { mcWaitForBridgeTool } from './wait-for-bridge.js';
+import { agentRuntimeTools } from './agent-tools.js';
 
 // Dev-only tools (default off). The bridge mirrors these gates with its own
 // BridgeConfig flags (runCommandEnabled), so even if
@@ -58,6 +60,7 @@ const scriptLogsEnabled = isEnvOn('MCDEV_SCRIPT_LOGS');
 const runCommandEnabled = isEnvOn('MCDEV_RUN_COMMAND');
 
 export const runtimeTools = [
+    ...agentRuntimeTools,
     mcConnectTool,
     mcExecuteTool,
     mcSnapshotTool,
