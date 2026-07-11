@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { chmod, mkdir, rm } from "node:fs/promises";
+import path from "node:path";
 import { readHistory, listSnippets, readSnippet, saveSnippet } from "./agent-store.js";
 import {
     acquireLease,
@@ -70,7 +73,12 @@ export const mcExecuteBothTool = {
         if (!primaryCode || !secondaryCode) throw new Error("Provide code or both client-specific code values");
         const barrier = args.barrier ?? true;
         const barrierDir = path.join(process.env.MCDEV_MCP_BARRIER_DIR ?? "/tmp/mcdev-mcp-barriers", randomUUID());
-        if (barrier) await mkdir(barrierDir, { recursive: true });
+        if (barrier) {
+            await mkdir(barrierDir, { recursive: true });
+            // MCP and the isolated client services can run as different local
+            // users. This high-entropy directory contains marker files only.
+            await chmod(barrierDir, 0o777);
+        }
         const wrap = (client: MinecraftClientName, peer: MinecraftClientName, code: string) => barrier
             ? `
 def __mcdevBarrierDir = java.nio.file.Path.of(${JSON.stringify(barrierDir)})
@@ -228,6 +236,3 @@ export const agentRuntimeTools = [
     mcEventsTool,
     mcTestControlTool,
 ];
-import { mkdir, rm } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
-import path from "node:path";
