@@ -1,6 +1,7 @@
 import { getClientSession, normalizeClient, requireLease } from "./tools/runtime/client-registry.js";
 import { executeOnClient } from "./tools/runtime/execute.js";
 import { mcExecuteBothTool } from "./tools/runtime/agent-tools.js";
+import { listSnippets, readHistory, readSnippet, saveSnippet } from "./tools/runtime/agent-store.js";
 import type { BridgeResponse, MinecraftClientName } from "./tools/runtime/types.js";
 
 export type { BridgeResponse, MinecraftClientName };
@@ -43,4 +44,29 @@ export function disconnectClient(clientValue?: MinecraftClientName): void {
 
 export function cancelClient(clientValue?: MinecraftClientName, reason?: string): void {
     getClientSession(normalizeClient(clientValue)).cancelPending(reason);
+}
+
+export function saveGroovySnippet(name: string, code: string) {
+    return { name, path: saveSnippet(name, code) };
+}
+
+export function listGroovySnippets() {
+    return listSnippets();
+}
+
+export function runGroovySnippet(options: {
+    name: string;
+    client?: MinecraftClientName;
+    timeoutMs?: number;
+    leaseId?: string;
+}) {
+    return executeOnClient({
+        ...options,
+        code: readSnippet(options.name),
+        snippet: options.name,
+    });
+}
+
+export function getExecutionHistory(limit = 50, client?: MinecraftClientName) {
+    return readHistory(limit, client);
 }
